@@ -1,0 +1,3 @@
+#io.confluent.devx.jqwik.CampaignArbitraryProvider
+#io.confluent.devx.jqwik.ClickArbitraryProvider
+#io.confluent.devx.jqwik.CostTypeArbitraryProvider

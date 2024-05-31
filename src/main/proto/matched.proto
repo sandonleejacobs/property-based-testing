@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+import "click.proto";
+import "campaign.proto";
+
+package io.confluent.devx.model;
+
+message MatchedClick {
+  Campaign campaign = 1;
+  Click click = 2;
+  google.protobuf.Timestamp matchTimestamp = 3;
+}
