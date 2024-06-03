@@ -1,6 +1,7 @@
 package io.confluent.devx;
 
 import com.google.protobuf.Timestamp;
+import io.confluent.devx.kafka.MyProtobufSerdes;
 import io.confluent.devx.model.CampaignOuterClass;
 import io.confluent.devx.model.ClickOuterClass;
 import io.confluent.devx.model.Matched;
@@ -37,15 +38,10 @@ public class FilterClickPayEventsTest {
 
     @BeforeEach
     void setup() {
-        Map<String, String> serdeConfig = new HashMap<>() {{
-            put(AbstractKafkaSchemaSerDeConfig.SCHEMA_REGISTRY_URL_CONFIG, "mock://my-registry");
-        }};
-        clickSerde = SerdeUtil.protobufSerde(ClickOuterClass.Click.class);
-        clickSerde.configure(Map.of(SerializationConfig.VALUE_CLASS_NAME, ClickOuterClass.Click.class), false);
-        campaignSerde = SerdeUtil.protobufSerde(CampaignOuterClass.Campaign.class);
-        campaignSerde.configure(Map.of(SerializationConfig.VALUE_CLASS_NAME, CampaignOuterClass.Campaign.class), false);
-        matchedClickSerde = SerdeUtil.protobufSerde(Matched.MatchedClick.class);
-        matchedClickSerde.configure(Map.of(SerializationConfig.VALUE_CLASS_NAME, Matched.MatchedClick.class), false);
+
+        clickSerde = MyProtobufSerdes.serde(ClickOuterClass.Click.newBuilder());
+        campaignSerde = MyProtobufSerdes.serde(CampaignOuterClass.Campaign.newBuilder());
+        matchedClickSerde = MyProtobufSerdes.serde(Matched.MatchedClick.newBuilder());
 
         Properties props = new Properties() {{
             put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
@@ -75,8 +71,8 @@ public class FilterClickPayEventsTest {
         CampaignOuterClass.Campaign campaign = campaignArbitrary(campaignId);
         ClickOuterClass.Click click = clickArbitrary(campaignId);
 
-        clickTestInputTopic.pipeInput(click.getId(), click);
         campaignTestInputTopic.pipeInput(campaign.getId(), campaign);
+        clickTestInputTopic.pipeInput(click.getId(), click);
 
         List<Matched.MatchedClick> output = matchedClickTestOutputTopic.readValuesToList()
                 .stream()

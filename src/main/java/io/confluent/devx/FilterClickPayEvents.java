@@ -1,5 +1,6 @@
 package io.confluent.devx;
 
+import com.google.protobuf.Timestamp;
 import io.confluent.devx.model.CampaignOuterClass;
 import io.confluent.devx.model.ClickOuterClass;
 import io.confluent.devx.model.Matched;
@@ -8,10 +9,7 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;
 import org.apache.kafka.streams.StreamsBuilder;
 import org.apache.kafka.streams.Topology;
-import org.apache.kafka.streams.kstream.Consumed;
-import org.apache.kafka.streams.kstream.KStream;
-import org.apache.kafka.streams.kstream.KTable;
-import org.apache.kafka.streams.kstream.Produced;
+import org.apache.kafka.streams.kstream.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,15 +43,14 @@ public class FilterClickPayEvents {
                         Consumed.with(Serdes.String(), campaignSerde))
                 .filter((k, v) -> "CPC".equals(v.getCostType()));
 
-        KStream<String, ClickOuterClass.Click> rekeyedClicks = builder.stream(CLICKS_INPUT_TOPIC,
+        KStream<String, ClickOuterClass.Click> clicksStream = builder.stream(CLICKS_INPUT_TOPIC,
                 Consumed.with(Serdes.String(), clickSerde))
                 .peek((k,v) -> LOG.warn("key {}, value {}", k, v))
-                .map((k, v) -> new KeyValue<>(v.getCampaignId(), v));
-        rekeyedClicks.to("rekeyedClicks", Produced.with(Serdes.String(), clickSerde));
+                .map((k,v) -> new KeyValue<>(v.getCampaignId(), v));
+        clicksStream.to("rekeyed-clicks", Produced.with(Serdes.String(), this.clickSerde));
 
-        rekeyedClicks.join(cpcCampaigns, (click, campaign) -> Matched.MatchedClick.newBuilder()
-                        .setCampaign(campaign)
-                        .setClick(click).build())
+        clicksStream.join(cpcCampaigns, new ClickCampaignValueJoiner(),
+                        Joined.with(Serdes.String(), clickSerde, campaignSerde))
                 .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), matchedClickSerde));
 
         return builder.build(props);
