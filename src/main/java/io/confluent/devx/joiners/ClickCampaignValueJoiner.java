@@ -1,4 +1,4 @@
-package io.confluent.devx;
+package io.confluent.devx.joiners;
 
 import com.google.protobuf.Timestamp;
 import io.confluent.devx.model.CampaignOuterClass;

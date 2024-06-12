@@ -1,6 +1,6 @@
 package io.confluent.devx;
 
-import com.google.protobuf.Timestamp;
+import io.confluent.devx.joiners.ClickCampaignValueJoiner;
 import io.confluent.devx.model.CampaignOuterClass;
 import io.confluent.devx.model.ClickOuterClass;
 import io.confluent.devx.model.Matched;

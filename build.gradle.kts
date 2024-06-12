@@ -25,14 +25,18 @@ application {
     mainClass.set("io.confluent.devx.Main")
 }
 
-java.sourceCompatibility = JavaVersion.VERSION_17
-java.targetCompatibility = JavaVersion.VERSION_17
+java.sourceCompatibility = JavaVersion.VERSION_21
+java.targetCompatibility = JavaVersion.VERSION_21
 
 group = "io.confluent.devx"
 version = "1.0-SNAPSHOT"
 
 val junitJupiterVersion = "5.10.2"
 val jqwikVersion = "1.8.4"
+
+val jacksonVersion = "2.17.1"
+
+val lombokVersion = "1.18.32"
 
 tasks.compileTestJava {
     options.compilerArgs.add("-parameters")
@@ -49,6 +53,17 @@ dependencies {
             strictly("3.6.0")
         }
     }
+
+    implementation("com.fasterxml.jackson.core:jackson-core:${jacksonVersion}")
+    implementation("com.fasterxml.jackson.core:jackson-databind:${jacksonVersion}")
+    implementation("com.fasterxml.jackson.core:jackson-annotations:${jacksonVersion}")
+
+    implementation("org.projectlombok:lombok:${lombokVersion}")
+    annotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+
+    testCompileOnly("org.projectlombok:lombok:${lombokVersion}")
+    testAnnotationProcessor("org.projectlombok:lombok:${lombokVersion}")
+    
     implementation("io.grpc:grpc-stub:1.64.0")
     implementation("io.grpc:grpc-protobuf:1.64.0")
     implementation("com.google.protobuf:protobuf-java:3.22.2")
