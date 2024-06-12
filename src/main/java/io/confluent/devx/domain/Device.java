@@ -1,5 +1,6 @@
 package io.confluent.devx.domain;
 
+import lombok.Builder;
 import lombok.Value;
 import lombok.experimental.SuperBuilder;
 import lombok.extern.jackson.Jacksonized;

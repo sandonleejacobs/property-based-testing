@@ -1,24 +1,18 @@
-import com.google.protobuf.gradle.id
-
 buildscript {
     repositories {
         gradlePluginPortal()
         maven("https://packages.confluent.io/maven/")
-        maven("https://jitpack.io")
     }
 }
 
 plugins {
     id("java")
     id("application")
-    id("com.google.protobuf") version "0.9.4"
-    id("com.github.imflog.kafka-schema-registry-gradle-plugin") version "2.1.0"
 }
 
 repositories {
     mavenCentral()
     maven("https://packages.confluent.io/maven/")
-    maven("https://jitpack.io")
 }
 
 application {
@@ -63,13 +57,6 @@ dependencies {
 
     testCompileOnly("org.projectlombok:lombok:${lombokVersion}")
     testAnnotationProcessor("org.projectlombok:lombok:${lombokVersion}")
-    
-    implementation("io.grpc:grpc-stub:1.64.0")
-    implementation("io.grpc:grpc-protobuf:1.64.0")
-    implementation("com.google.protobuf:protobuf-java:3.22.2")
-    implementation("io.confluent:kafka-protobuf-provider:7.6.0")
-    implementation("io.confluent:kafka-protobuf-serializer:7.6.0")
-    implementation("io.confluent:kafka-streams-protobuf-serde:7.6.0")
 
     implementation("io.confluent:kafka-schema-rules:7.6.0")
 
@@ -87,49 +74,4 @@ dependencies {
 
 tasks.test {
     useJUnitPlatform()
-}
-
-
-//sourceSets {
-//    main {
-//        java.srcDirs("src/main/java", "build/generated/source/proto/main/java")
-//        proto {
-//            srcDir("src/main/proto")
-//        }
-//    }
-//}
-val protocVersion = "3.14.0"
-val protocGenRpcVersion = "1.15.1"
-
-protobuf {
-    protoc {
-        if (osdetector.os == "osx") {
-            artifact = "com.google.protobuf:protoc:$protocVersion:osx-x86_64"
-        } else {
-            artifact = "com.google.protobuf:protoc:$protocVersion"
-        }
-    }
-    plugins {
-        // Optional: an artifact spec for a protoc plugin, with "grpc" as
-        // the identifier, which can be referred to in the "plugins"
-        // container of the "generateProtoTasks" closure.
-        id("grpc") {
-            if (osdetector.os == "osx") {
-                artifact = "io.grpc:protoc-gen-grpc-java:$protocGenRpcVersion:osx-x86_64"
-            } else {
-                artifact = "io.grpc:protoc-gen-grpc-java:$protocGenRpcVersion"
-            }
-        }
-    }
-    generateProtoTasks {
-        ofSourceSet("main").forEach {
-            it.plugins {
-                // Apply the "grpc" plugin whose spec is defined above, without
-                // options. Note the braces cannot be omitted, otherwise the
-                // plugin will not be added. This is because of the implicit way
-                // NamedDomainObjectContainer binds the methods.
-                id("grpc") { }
-            }
-        }
-    }
 }
