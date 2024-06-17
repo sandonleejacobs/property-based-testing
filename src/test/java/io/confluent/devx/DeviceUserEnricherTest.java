@@ -15,12 +15,20 @@ import java.util.stream.Collectors;
 
 import static io.confluent.devx.DeviceUserEnricher.*;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
+/**
+ * Property-based testing Kafka Streams Topology, which joins streams of data.
+ *
+ * Because of the complexity of the topology, generating 1000 or more tests consumes a large amount of time.
+ * Note that in the Property annotations on the test methods, we limit the number of tries, and run edge cases first.
+ */
 class DeviceUserEnricherTest {
 
-    @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST)
+    @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
     void testMatch(@ForAll("userArbitrary") User user, @ForAll("deviceArbitrary") Device device) {
 
+        // generate a user id to use in both objects
         final String matchingUserId = UUID.randomUUID().toString();
 
         User inputUser = user.toBuilder()
@@ -38,7 +46,6 @@ class DeviceUserEnricherTest {
         JsonSerdes<User> userJsonSerdes = new JsonSerdes<>(User.class);
         JsonSerdes<Device> deviceJsonSerdes = new JsonSerdes<>(Device.class);
         JsonSerdes<UserDeviceDetails> userDeviceDetailsJsonSerdes = new JsonSerdes<>(UserDeviceDetails.class);
-
 
         Topology topology = new DeviceUserEnricher(userJsonSerdes, deviceJsonSerdes, userDeviceDetailsJsonSerdes)
                 .buildTopology(props);
@@ -61,14 +68,68 @@ class DeviceUserEnricherTest {
                     .filter(ud -> ud.userId().equals(matchingUserId))
                     .collect(Collectors.toUnmodifiableList());
 
+            // there should ALWAYS be a matching UserDeviceDetails record from the topology because we matched the user id values.
             assertFalse(output.isEmpty());
         }
     }
 
+    @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
+    void testMiss(@ForAll("userArbitrary") User user, @ForAll("deviceArbitrary") Device device) {
 
+        // generate a user ID
+        final String userId = UUID.randomUUID().toString();
+
+        // set that user ID here
+        User inputUser = user.toBuilder()
+                .id(userId)
+                .build();
+        // force a different user ID onto the device
+        Device inputDevice = device.toBuilder()
+                .userId(new StringBuilder(userId).reverse().toString())
+                .build();
+
+        Properties props = new Properties() {{
+            put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+            put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        }};
+
+        JsonSerdes<User> userJsonSerdes = new JsonSerdes<>(User.class);
+        JsonSerdes<Device> deviceJsonSerdes = new JsonSerdes<>(Device.class);
+        JsonSerdes<UserDeviceDetails> userDeviceDetailsJsonSerdes = new JsonSerdes<>(UserDeviceDetails.class);
+
+        Topology topology = new DeviceUserEnricher(userJsonSerdes, deviceJsonSerdes, userDeviceDetailsJsonSerdes)
+                .buildTopology(props);
+
+        try (TopologyTestDriver testDriver = new TopologyTestDriver(topology, props)) {
+            TestInputTopic<String, User> userTestInputTopic = testDriver.createInputTopic(USERS_TOPIC,
+                    Serdes.String().serializer(), userJsonSerdes.serializer());
+            TestInputTopic<String, Device> deviceTestInputTopic = testDriver.createInputTopic(DEVICES_TOPIC,
+                    Serdes.String().serializer(), deviceJsonSerdes.serializer());
+
+            TestOutputTopic<String, UserDeviceDetails> outputTopic = testDriver.createOutputTopic(OUTPUT_TOPIC,
+                    Serdes.String().deserializer(), userDeviceDetailsJsonSerdes.deserializer());
+
+            userTestInputTopic.pipeInput(inputUser.getId(), inputUser);
+            deviceTestInputTopic.pipeInput(inputDevice.getId(), inputDevice);
+
+            List<UserDeviceDetails> output = outputTopic.readValuesToList()
+                    .stream()
+                    .filter(Objects::nonNull)
+                    .filter(ud -> ud.userId().equals(userId))
+                    .collect(Collectors.toUnmodifiableList());
+
+            // should NEVER get a match from the topology
+            assertTrue(output.isEmpty());
+        }
+    }
+
+    /**
+     * Arbitrary generator for User objects.
+     * @return
+     */
     @Provide
     public Arbitrary<User> userArbitrary() {
-        Arbitrary<String> idArb = Arbitraries.strings().alpha().ofLength(20);
+        Arbitrary<String> idArb = Arbitraries.strings().alpha().numeric().ofLength(20);
         Arbitrary<String> nameArb = Arbitraries.strings().alpha().ofLength(10);
         EmailArbitrary emailArb = Web.emails();
 
@@ -80,6 +141,9 @@ class DeviceUserEnricherTest {
                         .build());
     }
 
+    /**
+     * list of available device types
+     */
     private static final List<String> MOBILE_DEVICES = Arrays.asList(
             "iPhone",
             "Galaxy",
@@ -91,12 +155,16 @@ class DeviceUserEnricherTest {
             "Motorola"
     );
 
+    /**
+     * Arbitrary generator for Device objects.
+     * @return
+     */
     @Provide
     public Arbitrary<Device> deviceArbitrary() {
 
-        Arbitrary<String> idArb = Arbitraries.strings().alpha().ofLength(20);
+        Arbitrary<String> idArb = Arbitraries.strings().alpha().numeric().ofLength(20);
         Arbitrary<String> typeArb = Arbitraries.of(MOBILE_DEVICES);
-        Arbitrary<String> uidArb = Arbitraries.strings().alpha().ofLength(20);
+        Arbitrary<String> uidArb = Arbitraries.strings().alpha().numeric().ofLength(20);
 
         return Combinators.combine(idArb, typeArb, uidArb).as((id, type, uid) ->
                 Device.builder()

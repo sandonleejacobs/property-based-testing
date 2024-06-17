@@ -17,6 +17,12 @@ public class ShoutStreams {
     public static final String INPUT_TOPIC = "shout-input";
     public static final String OUTPUT_TOPIC = "shout-output";
 
+    /**
+     * Simple topology toUpperCase on any string input.
+     *
+     * @param props
+     * @return
+     */
     public Topology buildTopology(final Properties props) {
         final StreamsBuilder builder = new StreamsBuilder();
 
