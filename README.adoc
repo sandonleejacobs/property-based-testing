@@ -1,0 +1,286 @@
+= Property-Based Unit Test for Stream Processing
+
+Discussions on unit testing typically center on coverage, specifically statement coverage. Do the unit tests cover every
+line of code? Even the most simple of methods or functions can have 100% statement coverage and still generate problematic
+results.
+
+Test engineers (and application developers) tend to default to example-based tests, where one input scenario is tested. These
+example-based tests are useful, but the "universe of possible inputs" could generate nondeterministic outputs - or, even worse, a runtime error. Property-based testing is a useful addition where a test suite can execute hundreds or thousands of test inputs, using every conceivable input that could break the method under test - empty collections, negative numbers, long strings, special characters, etc...
+
+If the code survives a property-based test suite, you'll have a greater degree of confidence in the resiliency of that method
+in the production environment.
+
+The asynchronous, distributed nature of stream processing codebases could greatly benefit from this type of resiliency testing.
+Why? In most cases there's not a problem until there's a PROBLEM! Are these data pipelines processing events from multiple locales in several languages? What about data formats? Special characters? Null/empty values?
+
+Let's take a swag at applying the principles of property-based testing to Apache Kafka-based stream processing applications
+and topologies. We'll start with Kafka Streams, then attempt the same with Flink SQL. This is a Java example project. Therefore,
+we'll use the (https://jqwik.net/)[jqwik] framework to generate arbitrary objects as input events. Jqwik is far from the pioneer
+in the realm of property-based testing - not even on the JVM. For more information on property-based testing and other
+frameworks which support this paradigm, check out (https://jqwik.net/property-based-testing.html)[this page] in the jqwik documentation.
+
+== Kafka Streams
+The `test-utils` module of Kafka Streams provides the tools we need to execute JUnit test cases of a given topology. The `TopologyTestDriver` can be used to pipe data to input topics and interrogate output topics, applying basic assertions on the output data.
+
+Let's create both a simple and more realistic topology with property-based test suites.
+
+=== Simple Example
+
+The ShoutStreams topology is a very simple use case to start our Kafka Streams discussion. This topology simply performs
+a `toUpperCase()` on any `String` input event, piping that result to the designed output topic.
+
+```java
+    public Topology buildTopology(final Properties props) {
+        final StreamsBuilder builder = new StreamsBuilder();
+
+        KStream<String, String> inputStream = builder.stream(INPUT_TOPIC);
+
+        inputStream.peek((k, v) -> LOG.debug("input event -> key: {}, value {}", k, v))
+                .mapValues(v -> v.toUpperCase())
+                .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), Serdes.String()));
+
+        return builder.build(props);
+    }
+```
+
+With this in mind, a property-based test could simply create a random alphanumeric `String` as the value of the inbound
+Kafka event. Then the test evaluates the output from the output topic, comparing the all-caps version of the input to the actual
+output.
+
+```java
+    @Property
+    void testShout(@ForAll("alphaNumericStrings") String input) {
+        // for later comparison, force the input to lower case
+        final String lowerInput = input.toLowerCase();
+
+        Topology topology = new ShoutStreams().buildTopology(props);
+        try(TopologyTestDriver testDriver = new TopologyTestDriver(topology, props)) {
+            TestInputTopic<String, String> testInputTopic = testDriver.createInputTopic(INPUT_TOPIC,
+                    Serdes.String().serializer(), Serdes.String().serializer());
+
+            TestOutputTopic<String, String> testOutputTopic = testDriver.createOutputTopic(OUTPUT_TOPIC,
+                    Serdes.String().deserializer(), Serdes.String().deserializer());
+
+            // with a randomized key, send the lowerInput to the input topic
+            testInputTopic.pipeInput(UUID.randomUUID().toString(), lowerInput);
+            final String actualOutput = testOutputTopic.readValue();
+
+            // the topology should output a string identical to the UPPER CASE of our input value.
+            assertEquals(lowerInput.toUpperCase(), actualOutput);
+        }
+    }
+
+    @Provide
+    public Arbitrary<String> alphaNumericStrings() {
+        return Arbitraries.strings()
+                .alpha()
+                .numeric()
+                .ofMaxLength(1)
+                .ofMaxLength(100);
+    }
+```
+
+Let's explain some concepts here. The junit-savvy user will immediately notice the `@Property` annotation versus the typical
+`@Test` annotation. This tells jUnit to execute this test with the `jqwik` runner.
+
+Next is the `@ForAll` annotation on a parameter in the test method. This tells jqwik to generate some input with "interesting" values. In this case, we explicitly define an `Arbritrary` supplier to use for generating input - a method annotated to `@Provide` an `Arbitrary<String>`. As the name implies, an `Arbitrary` is just random choice.
+
+Our `@Provide` supplier uses one of the canned `Arbitraries` methods to define how we'd like our generated `String` objects. The resulting `String` will be alphanumeric of some length between 1 and 100 characters.
+
+Executing this simple test will generate many (in this case 1000) test executions:
+
+```shell
+timestamp = 2024-06-17T11:09:23.554582, ShoutStreamsTest:testShout =
+                              |-----------------------jqwik-----------------------
+tries = 1000                  | # of calls to property
+checks = 1000                 | # of not rejected calls
+generation = RANDOMIZED       | parameters are randomly generated
+after-failure = SAMPLE_FIRST  | try previously failed sample, then previous seed
+when-fixed-seed = ALLOW       | fixing the random seed is allowed
+edge-cases#mode = MIXIN       | edge cases are mixed in
+edge-cases#total = 7          | # of all combined edge cases
+edge-cases#tried = 7          | # of edge cases tried in current run
+seed = -8907747202341246742   | random seed to reproduce generated values
+```
+
+Now you see a tangible benefit: we ran 1000 tests on this method in a matter of seconds. It's virtually impossible to code this
+number of example-based tests.
+
+This simple example is nice. But maybe over-simplified? My Kafka Streams topologies have REAL work to do.
+
+=== Join Example
+
+Let's create an example topology that joins 2 streams of data. One is a `User` which has an `id` attribute. The other stream consists of `Device` events, which have a `userId` attribute. Kafka Streams is more than capable of joining these 2 streams - outputting the details of a `Device` enriched with information about the `User` of that device as a `UserDeviceDetails` object on an output topic.
+
+```java
+    public Topology buildTopology(final Properties props) {
+        final StreamsBuilder builder = new StreamsBuilder();
+
+        KStream<String, Device> devicesByUser = builder.stream(DEVICES_TOPIC,
+                Consumed.with(Serdes.String(), deviceSerde))
+                .peek((k, v) -> LOG.warn("device: key = {}, value = {}", k, v))
+                .map((k,v) -> new KeyValue<>(v.getUserId(), v));
+        devicesByUser.to("rekeyed-devices", Produced.with(Serdes.String(), deviceSerde));
+
+        KTable<String, User> userTable = builder.table(USERS_TOPIC,
+                Consumed.with(Serdes.String(), new JsonSerdes<>(User.class)));
+
+        devicesByUser.join(userTable, new DeviceUserValueJoiner(),
+                Joined.with(Serdes.String(), new JsonSerdes<>(Device.class), userSerde))
+                .to(OUTPUT_TOPIC, Produced.with(Serdes.String(), userDeviceDetailsSerde));
+
+        return builder.build(props);
+    }
+```
+
+There are 2 cases to test here - the "match" and the "miss" of the defined join. But first we need a way to generate `Arbitrary` instances of both the `Device` and `User` input objects.
+
+```java
+    /**
+     * Arbitrary generator for User objects.
+     */
+    @Provide
+    public Arbitrary<User> userArbitrary() {
+        Arbitrary<String> idArb = Arbitraries.strings().alpha().numeric().ofLength(20);
+        Arbitrary<String> nameArb = Arbitraries.strings().alpha().ofLength(10);
+        EmailArbitrary emailArb = Web.emails();
+
+        return Combinators.combine(idArb, nameArb, emailArb).as((id, name, email) ->
+                User.builder()
+                        .id(id)
+                        .name(name)
+                        .email(email)
+                        .build());
+    }
+
+    /**
+     * list of available device types
+     */
+    private static final List<String> MOBILE_DEVICES = Arrays.asList(
+            "iPhone",
+            "Galaxy",
+            "Pixel",
+            "OnePlus",
+            "Xperia",
+            "Nokia",
+            "Huawei",
+            "Motorola"
+    );
+
+    /**
+     * Arbitrary generator for Device objects.
+     */
+    @Provide
+    public Arbitrary<Device> deviceArbitrary() {
+
+        Arbitrary<String> idArb = Arbitraries.strings().alpha().numeric().ofLength(20);
+        // pick one of the mobile devices from the available list.
+        Arbitrary<String> typeArb = Arbitraries.of(MOBILE_DEVICES);
+        Arbitrary<String> uidArb = Arbitraries.strings().alpha().numeric().ofLength(20);
+
+        return Combinators.combine(idArb, typeArb, uidArb).as((id, type, uid) ->
+                Device.builder()
+                        .id(id)
+                        .type(type)
+                        .userId(uid)
+                        .build()
+        );
+    }
+```
+
+With there `Arbitrary` suppliers, we can get into our test cases. In the "match" case, we'll manipulate the input objects to simulate an expected match from the topology:
+
+```java
+    @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
+    void testMatch(@ForAll("userArbitrary") User user, @ForAll("deviceArbitrary") Device device) {
+
+        // generate a user id to use in both objects
+        final String matchingUserId = UUID.randomUUID().toString();
+
+        User inputUser = user.toBuilder()
+                .id(matchingUserId)
+                .build();
+        Device inputDevice = device.toBuilder()
+                .userId(matchingUserId)
+                .build();
+
+        final Function<TestOutputTopic<String, UserDeviceDetails>, List<UserDeviceDetails>> outputFunction = topic ->
+                topic.readValuesToList()
+                        .stream()
+                        .filter(Objects::nonNull)
+                        .filter(ud -> ud.userId().equals(matchingUserId))
+                        .collect(Collectors.toUnmodifiableList());
+
+        List<UserDeviceDetails> output = executeTopology(inputUser, inputDevice, outputFunction);
+        // there should ALWAYS be a matching UserDeviceDetails record from the topology because we matched the user id values.
+        assertEquals(1, output.size());
+    }
+```
+
+There are a couple of new concepts here. Given the complexity of this topology, running 1000 test cases doesn't give us the "quick feedback loop" that unit tests are designed to satisfy. There is quite a bit of framework instantiation needed here to execute the topology. With that in mind, we use the optional parameters of the `@Property` annotation to limit the number of test executions and execute "edge cases" first. Property-based testing uses a concept known as "shrinking" such that when a failure occurs, the framework will output a minimal example case. This example case could be used to create an example-based test for debugging the method under test.
+
+I took the liberty here to make the code executing the topology reusable to the "miss"-use case. The `executeTopology()` method
+takes the input objects and a function for how to filter the output topic, returning a `List` used in our test assertions. In the "match"-use case, we expect there to be a value in the returned `List`.
+
+```java
+    private List<UserDeviceDetails> executeTopology(final User inputUser, final Device inputDevice,
+                                                    final Function<TestOutputTopic<String, UserDeviceDetails>,  List<UserDeviceDetails>> outputFunction) {
+
+        Properties props = new Properties() {{
+            put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+            put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
+        }};
+
+        JsonSerdes<User> userJsonSerdes = new JsonSerdes<>(User.class);
+        JsonSerdes<Device> deviceJsonSerdes = new JsonSerdes<>(Device.class);
+        JsonSerdes<UserDeviceDetails> userDeviceDetailsJsonSerdes = new JsonSerdes<>(UserDeviceDetails.class);
+
+        Topology topology = new DeviceUserEnricher(userJsonSerdes, deviceJsonSerdes, userDeviceDetailsJsonSerdes)
+                .buildTopology(props);
+
+        try (TopologyTestDriver testDriver = new TopologyTestDriver(topology, props)) {
+            TestInputTopic<String, User> userTestInputTopic = testDriver.createInputTopic(USERS_TOPIC,
+                    Serdes.String().serializer(), userJsonSerdes.serializer());
+            TestInputTopic<String, Device> deviceTestInputTopic = testDriver.createInputTopic(DEVICES_TOPIC,
+                    Serdes.String().serializer(), deviceJsonSerdes.serializer());
+
+            TestOutputTopic<String, UserDeviceDetails> outputTopic = testDriver.createOutputTopic(OUTPUT_TOPIC,
+                    Serdes.String().deserializer(), userDeviceDetailsJsonSerdes.deserializer());
+
+            userTestInputTopic.pipeInput(inputUser.getId(), inputUser);
+            deviceTestInputTopic.pipeInput(inputDevice.getId(), inputDevice);
+            return outputFunction.apply(outputTopic);
+        }
+    }
+
+```
+
+The "miss"-use case will force the `userId` values of the input objects to NOT be equal. The result of the topology should then be NO MATCH - manifested by our `executeTopology()` method returned an empty `List` from the output topic.
+
+```java
+    @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
+    void testMiss(@ForAll("userArbitrary") User user, @ForAll("deviceArbitrary") Device device) {
+
+        // generate a user ID
+        final String userId = UUID.randomUUID().toString();
+
+        // set that user ID here
+        User inputUser = user.toBuilder()
+                .id(userId)
+                .build();
+        // force a different user ID onto the device
+        Device inputDevice = device.toBuilder()
+                .userId(new StringBuilder(userId).reverse().toString())
+                .build();
+
+        final Function<TestOutputTopic<String, UserDeviceDetails>, List<UserDeviceDetails>> outputFunction = topic ->
+                topic.readValuesToList()
+                        .stream()
+                        .filter(Objects::nonNull)
+                        .filter(ud -> ud.userId().equals(userId))
+                        .collect(Collectors.toUnmodifiableList());
+
+        List<UserDeviceDetails> output = executeTopology(inputUser, inputDevice, outputFunction);
+        assertTrue(output.isEmpty());
+    }
+```

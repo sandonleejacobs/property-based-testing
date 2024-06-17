@@ -1,2 +1,2 @@
-rootProject.name = "generative-testing"
+rootProject.name = "property-based-testing"
 

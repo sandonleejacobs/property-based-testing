@@ -11,15 +11,15 @@ import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
 
 import java.util.*;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 import static io.confluent.devx.DeviceUserEnricher.*;
-import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Property-based testing Kafka Streams Topology, which joins streams of data.
- *
+ * <p>
  * Because of the complexity of the topology, generating 1000 or more tests consumes a large amount of time.
  * Note that in the Property annotations on the test methods, we limit the number of tries, and run edge cases first.
  */
@@ -38,39 +38,17 @@ class DeviceUserEnricherTest {
                 .userId(matchingUserId)
                 .build();
 
-        Properties props = new Properties() {{
-            put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-            put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
-        }};
+        final Function<TestOutputTopic<String, UserDeviceDetails>, List<UserDeviceDetails>> outputFunction = topic ->
+                topic.readValuesToList()
+                        .stream()
+                        .filter(Objects::nonNull)
+                        .filter(ud -> ud.userId().equals(matchingUserId))
+                        .collect(Collectors.toUnmodifiableList());
 
-        JsonSerdes<User> userJsonSerdes = new JsonSerdes<>(User.class);
-        JsonSerdes<Device> deviceJsonSerdes = new JsonSerdes<>(Device.class);
-        JsonSerdes<UserDeviceDetails> userDeviceDetailsJsonSerdes = new JsonSerdes<>(UserDeviceDetails.class);
-
-        Topology topology = new DeviceUserEnricher(userJsonSerdes, deviceJsonSerdes, userDeviceDetailsJsonSerdes)
-                .buildTopology(props);
-
-        try (TopologyTestDriver testDriver = new TopologyTestDriver(topology, props)) {
-            TestInputTopic<String, User> userTestInputTopic = testDriver.createInputTopic(USERS_TOPIC,
-                    Serdes.String().serializer(), userJsonSerdes.serializer());
-            TestInputTopic<String, Device> deviceTestInputTopic = testDriver.createInputTopic(DEVICES_TOPIC,
-                    Serdes.String().serializer(), deviceJsonSerdes.serializer());
-
-            TestOutputTopic<String, UserDeviceDetails> outputTopic = testDriver.createOutputTopic(OUTPUT_TOPIC,
-                    Serdes.String().deserializer(), userDeviceDetailsJsonSerdes.deserializer());
-
-            userTestInputTopic.pipeInput(inputUser.getId(), inputUser);
-            deviceTestInputTopic.pipeInput(inputDevice.getId(), inputDevice);
-
-            List<UserDeviceDetails> output = outputTopic.readValuesToList()
-                    .stream()
-                    .filter(Objects::nonNull)
-                    .filter(ud -> ud.userId().equals(matchingUserId))
-                    .collect(Collectors.toUnmodifiableList());
-
-            // there should ALWAYS be a matching UserDeviceDetails record from the topology because we matched the user id values.
-            assertFalse(output.isEmpty());
-        }
+        List<UserDeviceDetails> output = executeTopology(inputUser, inputDevice, outputFunction);
+        // there should ALWAYS be a matching UserDeviceDetails record from the topology because we matched the user id values.
+        assertFalse(output.isEmpty());
+        assertEquals(1, output.size());
     }
 
     @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
@@ -88,6 +66,20 @@ class DeviceUserEnricherTest {
                 .userId(new StringBuilder(userId).reverse().toString())
                 .build();
 
+        final Function<TestOutputTopic<String, UserDeviceDetails>, List<UserDeviceDetails>> outputFunction = topic ->
+                topic.readValuesToList()
+                        .stream()
+                        .filter(Objects::nonNull)
+                        .filter(ud -> ud.userId().equals(userId))
+                        .collect(Collectors.toUnmodifiableList());
+
+        List<UserDeviceDetails> output = executeTopology(inputUser, inputDevice, outputFunction);
+        assertTrue(output.isEmpty());
+    }
+
+    private List<UserDeviceDetails> executeTopology(final User inputUser, final Device inputDevice,
+                                                    final Function<TestOutputTopic<String, UserDeviceDetails>, List<UserDeviceDetails>> outputFunction) {
+
         Properties props = new Properties() {{
             put(StreamsConfig.DEFAULT_KEY_SERDE_CLASS_CONFIG, Serdes.String().getClass());
             put(StreamsConfig.DEFAULT_VALUE_SERDE_CLASS_CONFIG, Serdes.String().getClass());
@@ -111,20 +103,13 @@ class DeviceUserEnricherTest {
 
             userTestInputTopic.pipeInput(inputUser.getId(), inputUser);
             deviceTestInputTopic.pipeInput(inputDevice.getId(), inputDevice);
-
-            List<UserDeviceDetails> output = outputTopic.readValuesToList()
-                    .stream()
-                    .filter(Objects::nonNull)
-                    .filter(ud -> ud.userId().equals(userId))
-                    .collect(Collectors.toUnmodifiableList());
-
-            // should NEVER get a match from the topology
-            assertTrue(output.isEmpty());
+            return outputFunction.apply(outputTopic);
         }
     }
 
     /**
      * Arbitrary generator for User objects.
+     *
      * @return
      */
     @Provide
@@ -157,6 +142,7 @@ class DeviceUserEnricherTest {
 
     /**
      * Arbitrary generator for Device objects.
+     *
      * @return
      */
     @Provide
