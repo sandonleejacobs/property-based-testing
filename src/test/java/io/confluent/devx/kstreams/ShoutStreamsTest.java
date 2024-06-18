@@ -1,6 +1,5 @@
-package io.confluent.devx;
+package io.confluent.devx.kstreams;
 
-import io.confluent.devx.kstreams.ShoutStreams;
 import net.jqwik.api.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;

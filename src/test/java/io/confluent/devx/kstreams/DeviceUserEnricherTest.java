@@ -1,9 +1,8 @@
-package io.confluent.devx;
+package io.confluent.devx.kstreams;
 
 import io.confluent.devx.domain.Device;
 import io.confluent.devx.domain.User;
 import io.confluent.devx.domain.UserDeviceDetails;
-import io.confluent.devx.kstreams.DeviceUserEnricher;
 import io.confluent.devx.kstreams.serialization.JsonSerdes;
 import net.jqwik.api.*;
 import net.jqwik.web.api.EmailArbitrary;

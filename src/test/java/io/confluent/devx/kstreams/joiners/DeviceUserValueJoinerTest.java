@@ -1,4 +1,4 @@
-package io.confluent.devx.joiners;
+package io.confluent.devx.kstreams.joiners;
 
 import io.confluent.devx.domain.Device;
 import io.confluent.devx.domain.User;
