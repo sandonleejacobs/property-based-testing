@@ -110,7 +110,7 @@ This simple example is nice. But maybe over-simplified? My Kafka Streams topolog
 
 === Join Example
 
-Let's create an example topology that joins 2 streams of data. One is a `User` which has an `id` attribute. The other stream consists of `Device` events, which have a `userId` attribute. Kafka Streams is more than capable of joining these 2 streams - outputting the details of a `Device` enriched with information about the `User` of that device as a `UserDeviceDetails` object on an output topic.
+Let's create an example topology that joins 2 streams of data. One stream contains `User` events, which have an `id` attribute. The other stream consists of `Device` events, which has a `userId` attribute. Kafka Streams is more than capable of joining these 2 streams - outputting the details of a `Device` enriched with information about the `User` of that device as a `UserDeviceDetails` object on an output topic.
 
 ```java
     public Topology buildTopology(final Properties props) {
