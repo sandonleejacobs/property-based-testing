@@ -15,9 +15,9 @@ Why? In most cases there's not a problem until there's a PROBLEM! Are these data
 
 Let's take a swag at applying the principles of property-based testing to Apache Kafka-based stream processing applications
 and topologies. We'll start with Kafka Streams, then attempt the same with Flink SQL. This is a Java example project. Therefore,
-we'll use the (https://jqwik.net/)[jqwik] framework to generate arbitrary objects as input events. Jqwik is far from the pioneer
+we'll use the https://jqwik.net/)[jqwik] framework to generate arbitrary objects as input events. Jqwik is far from the pioneer
 in the realm of property-based testing - not even on the JVM. For more information on property-based testing and other
-frameworks which support this paradigm, check out (https://jqwik.net/property-based-testing.html)[this page] in the jqwik documentation.
+frameworks which support this paradigm, check out https://jqwik.net/property-based-testing.html)[this page] in the jqwik documentation.
 
 == Kafka Streams
 The `test-utils` module of Kafka Streams provides the tools we need to execute JUnit test cases of a given topology. The `TopologyTestDriver` can be used to pipe data to input topics and interrogate output topics, applying basic assertions on the output data.
