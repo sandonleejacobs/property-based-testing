@@ -3,7 +3,8 @@ package io.confluent.devx;
 import io.confluent.devx.domain.Device;
 import io.confluent.devx.domain.User;
 import io.confluent.devx.domain.UserDeviceDetails;
-import io.confluent.devx.serilaization.JsonSerdes;
+import io.confluent.devx.kstreams.DeviceUserEnricher;
+import io.confluent.devx.kstreams.serialization.JsonSerdes;
 import net.jqwik.api.*;
 import net.jqwik.web.api.EmailArbitrary;
 import net.jqwik.web.api.Web;
@@ -14,7 +15,7 @@ import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import static io.confluent.devx.DeviceUserEnricher.*;
+import static io.confluent.devx.kstreams.DeviceUserEnricher.*;
 import static org.junit.jupiter.api.Assertions.*;
 
 /**

@@ -1,4 +1,4 @@
-package io.confluent.devx;
+package io.confluent.devx.kstreams;
 
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.StreamsBuilder;

@@ -1,10 +1,9 @@
-package io.confluent.devx.serilaization;
+package io.confluent.devx.kstreams.serialization;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.kafka.common.serialization.Deserializer;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serializer;
-import org.apache.kafka.common.serialization.Serdes;
 
 import java.util.Map;
 

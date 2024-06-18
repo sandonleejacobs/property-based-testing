@@ -1,10 +1,10 @@
-package io.confluent.devx;
+package io.confluent.devx.kstreams;
 
 import io.confluent.devx.domain.Device;
 import io.confluent.devx.domain.User;
 import io.confluent.devx.domain.UserDeviceDetails;
-import io.confluent.devx.joiners.DeviceUserValueJoiner;
-import io.confluent.devx.serilaization.JsonSerdes;
+import io.confluent.devx.kstreams.joiners.DeviceUserValueJoiner;
+import io.confluent.devx.kstreams.serialization.JsonSerdes;
 import org.apache.kafka.common.serialization.Serde;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.KeyValue;

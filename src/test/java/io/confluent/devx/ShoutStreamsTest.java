@@ -1,5 +1,6 @@
 package io.confluent.devx;
 
+import io.confluent.devx.kstreams.ShoutStreams;
 import net.jqwik.api.*;
 import org.apache.kafka.common.serialization.Serdes;
 import org.apache.kafka.streams.*;
@@ -7,8 +8,8 @@ import org.apache.kafka.streams.*;
 import java.util.Properties;
 import java.util.UUID;
 
-import static io.confluent.devx.ShoutStreams.INPUT_TOPIC;
-import static io.confluent.devx.ShoutStreams.OUTPUT_TOPIC;
+import static io.confluent.devx.kstreams.ShoutStreams.INPUT_TOPIC;
+import static io.confluent.devx.kstreams.ShoutStreams.OUTPUT_TOPIC;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 public class ShoutStreamsTest {

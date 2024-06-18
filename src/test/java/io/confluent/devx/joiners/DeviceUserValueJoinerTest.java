@@ -3,6 +3,7 @@ package io.confluent.devx.joiners;
 import io.confluent.devx.domain.Device;
 import io.confluent.devx.domain.User;
 import io.confluent.devx.domain.UserDeviceDetails;
+import io.confluent.devx.kstreams.joiners.DeviceUserValueJoiner;
 import net.jqwik.api.*;
 import net.jqwik.web.api.EmailArbitrary;
 import net.jqwik.web.api.Web;
