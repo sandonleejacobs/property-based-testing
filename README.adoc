@@ -1,4 +1,4 @@
-= Property-Based Unit Test for Stream Processing
+= Property-Based Testing for Stream Processing
 
 Discussions on unit testing typically center on coverage, specifically statement coverage. Do the unit tests cover every
 line of code? Even the most simple of methods or functions can have 100% statement coverage and still generate problematic
