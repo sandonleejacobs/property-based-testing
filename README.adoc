@@ -1,13 +1,12 @@
 = Property-Based Testing for Stream Processing
 
 Discussions on unit testing typically center on coverage, specifically statement coverage. Do the unit tests cover every
-line of code? Even the most simple of methods or functions can have 100% statement coverage and still generate problematic
-results.
+line of code? Even the most simple of methods or functions can have 100% statement coverage and still create serious production problems.
 
 Test engineers (and application developers) tend to default to example-based tests, where one input scenario is tested. These
 example-based tests are useful, but the "universe of possible inputs" could generate nondeterministic outputs - or, even worse, a runtime error. Property-based testing is a useful addition where a test suite can execute hundreds or thousands of test inputs, using every conceivable input that could break the method under test - empty collections, negative numbers, long strings, special characters, etc...
 
-If the code survives a property-based test suite, you'll have a greater degree of confidence in the resiliency of that method
+If the code passes a property-based test suite, you'll have a greater degree of confidence in the resiliency of that method
 in the production environment.
 
 == Applying the Paradigm to Data Pipelines
@@ -21,24 +20,21 @@ we'll use the https://jqwik.net/)[jqwik] framework to generate arbitrary objects
 
 == Tooling
 
-Coming back to Java shops, I've always looked for libraries to provide the tools I found useful in more functional paradigm languages. In my Scala/Finatra/Spark days, I was impressed by libraries like https://scalacheck.org/)[scalacheck] - particularly how simple it was to generate random inputs and run many scenarios with a short feedback loop. I also enjoyed the bindings to test libraries like scalatest and specs2, such that it wasn't cumbersome to implement and incorporate these tests into the existing test pipeline.
+Coming back to Java shops, I've always looked for libraries to provide the tools I found useful in functional paradigm languages. In my Scala/Finatra/Spark days, I was impressed by libraries like https://scalacheck.org/)[scalacheck] - particularly how simple it was to generate random inputs and run many scenarios with a short feedback loop. There were simple bindings to test libraries like scalatest and specs2, making it easy to incorporate property-based tests into the existing test pipeline.
 
-https://jqwik.net)[Jqwik] seems to check those boxes, integrating seamlessly with JUnit to execute test scenarios. For more information on property-based testing and other frameworks which support this paradigm, check out https://jqwik.net/property-based-testing.html)[this page] in the jqwik documentation.
-
-Jqwik is far from the pioneer in the realm of property-based testing - not even on the JVM. Clojure now has https://clojure.org/guides/test_check_beginner)[test.check] - earlier there was test.generative. All of these frameworks are inspired in some way by Haskell https://hackage.haskell.org/package/QuickCheck)[QuickCheck].
+https://jqwik.net)[Jqwik] seems to check those boxes, integrating seamlessly with junit to execute test scenarios. Jqwik is far from the pioneer in the realm of property-based testing - not even on the JVM. Clojure now has https://clojure.org/guides/test_check_beginner)[test.check] - earlier there was test.generative. All of these frameworks are inspired in some way by Haskell https://hackage.haskell.org/package/QuickCheck)[QuickCheck]. For more information on property-based testing and frameworks, check out https://jqwik.net/property-based-testing.html)[this page] in the jqwik documentation.
 
 === Quick Aside
 
-I believe there is a welcomed side effect - particularly for Java codebases - when it comes to property-based testing. I find the style of my code to become much more functional and concise in nature. Object-oriented programming can easily lead us towards behavior such as methods with side effects, mutability, and overuse of instance fields. In distributed, event-driven systems, problems caused by misuse of such constructs can cause a lot of harm in very short order.
+I believe there is a welcomed side effect - particularly for Java codebases - when it comes to property-based testing. I find the style of my code to become much more functional and concise in nature. Object-oriented programming can easily lead us towards behavior such as methods with side effects, mutability, and overuse of instance fields. In distributed, event-driven systems, problems often caused these concepts can have quite the blast radius.
 
-NOTE: When we begin thinking more functional, our code becomes much easier to read, debug, and refactor. Our applications are now composed of well-tested, highly resilient functions.
-
+When we begin thinking more functional, our code becomes much easier to read, debug, and refactor. Our applications are now composed of well-tested, highly resilient functions and methods.
 
 == Examples with Kafka Streams
 
 The `test-utils` module of Kafka Streams provides the tools we need to execute JUnit test cases of a given topology. The `TopologyTestDriver` can be used to pipe data to input topics and interrogate output topics, applying basic assertions on the output data.
 
-Using the provided `test-utils` along with Jqwik, let's create a simple topology with property-based test suites. Later, we'll explore a more "realistic" topology - specifically a join of 2 streams.
+Using the provided `test-utils` along with jqwik, let's create a simple topology with property-based test suites. Later, we'll explore a more "realistic" topology - specifically a join of 2 streams.
 
 === Simple Example
 
@@ -60,8 +56,8 @@ a `toUpperCase()` on any `String` input event, piping the resulting `String` to 
 ```
 
 With this in mind, a property-based test could simply create a random alphanumeric `String` as the value of the inbound
-Kafka event. Then the test evaluates the output from the output topic, comparing the all-caps version of the input to the actual
-output.
+Kafka event. Then the test evaluates the output topic, comparing the all-caps version of the input to the actual
+output event(s).
 
 ```java
     @Property
@@ -97,11 +93,11 @@ output.
 ```
 
 Let's explain some concepts here. The junit-savvy user will immediately notice the `@Property` annotation versus the typical
-`@Test` annotation. This tells jUnit to execute this test with the `jqwik` runner.
+`@Test` annotation. This `@Property` annotation tells junit to execute this test with the `jqwik` runner.
 
-Next is the `@ForAll` annotation on a parameter in the test method. This tells jqwik to generate some input with "interesting" values. In this case, we explicitly define an `Arbitrary` supplier to use for generating input - a method annotated to `@Provide` an `Arbitrary<String>`. As the name implies, an `Arbitrary` is just random choice.
+Next is the `@ForAll` annotation on a parameter in the test method. This tells jqwik to generate some input with "interesting" values. In this case, we explicitly define an `Arbitrary` supplier to use for generating input - a method annotated to `@Provide` an `Arbitrary<String>`. As the name implies, an `Arbitrary` is just randomly generated value.
 
-Our `@Provide` supplier uses one of the canned `Arbitraries` methods to define how we'd like our generated `String` objects. The resulting `String` will be alphanumeric of some length between 1 and 100 characters.
+Our `@Provide` supplier uses one of the canned `Arbitraries` methods to define how we'd like our `String` objects to be generated. In this case the result is an alphanumeric `String` of some length between 1 and 100 characters.
 
 Executing this simple test will generate many (in this case 1000) test executions:
 
@@ -121,11 +117,11 @@ seed = -8907747202341246742   | random seed to reproduce generated values
 
 Now you see a tangible benefit: we ran 1000 tests on this method in a matter of seconds. ONE THOUSAND TEST SCENARIOS! It's virtually impossible to code this number of example-based tests.
 
-So you're likely thinking: This simple example is nice. Maybe over-simplified. My Kafka Streams topologies have REAL work to do.
+So you're likely thinking: "This simple example is nice. Maybe over-simplified. My Kafka Streams topologies have REAL work to do."
 
 === Join Example
 
-Let's create an example topology that joins 2 streams of data. One stream contains `User` events, which have an `id` attribute. The other stream consists of `Device` events, which has a `userId` attribute. Kafka Streams is more than capable of joining these 2 streams - outputting the details of a `Device` enriched with information about the `User` of that device as a `UserDeviceDetails` object on an output topic.
+Let's create an example topology that joins 2 streams of data. One stream contains `User` events, which have an `id` attribute. The other stream consists of `Device` events, which have a `userId` attribute. Kafka Streams is more than capable of joining these 2 streams - outputting the details of a `Device` enriched with information about the `User` of that device as a `UserDeviceDetails` object to an output topic.
 
 ```java
     public Topology buildTopology(final Properties props) {
@@ -148,7 +144,7 @@ Let's create an example topology that joins 2 streams of data. One stream contai
     }
 ```
 
-There are 2 cases to test here - the "match" and the "miss" of the defined join. But first we need a way to generate `Arbitrary` instances of both the `Device` and `User` input objects.
+There are 2 use cases to test here - the "match" and the "miss" of the defined join. But first we need a way to generate `Arbitrary` instances of both the `Device` and `User` input objects.
 
 ```java
     /**
@@ -203,7 +199,7 @@ There are 2 cases to test here - the "match" and the "miss" of the defined join.
     }
 ```
 
-With these `Arbitrary` suppliers, we can get into our test cases. In the "match" case, we'll manipulate the input objects to simulate an expected match from the topology:
+With these `Arbitrary` suppliers, we can get into our test cases. In the "match" use case, we'll manipulate the input objects to simulate an expected match from the topology:
 
 ```java
     @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
@@ -232,10 +228,10 @@ With these `Arbitrary` suppliers, we can get into our test cases. In the "match"
     }
 ```
 
-There are a couple of new concepts here. Given the complexity of this topology, running 1000 test cases doesn't give us the "quick feedback loop" that unit tests are designed to satisfy. There is quite a bit of framework instantiation needed here to execute the topology. With that in mind, we use the optional parameters of the `@Property` annotation to limit the number of test executions and execute "edge cases" first. Property-based testing uses a concept known as "shrinking" such that when a failure occurs, the framework will output a minimal example case. This example case could be used to create an example-based test for debugging the method under test.
+There are a couple of new concepts here. Given the complexity of this topology, running 1000 test cases doesn't give us the "quick feedback loop" that unit tests are designed to satisfy. There is quite a bit of Kafka Streams framework instantiation needed to execute the topology. With that in mind, we use the parameters of the `@Property` annotation to limit the number of test executions (`tries`) and execute "edge cases" first. Property-based testing uses a concept known as "shrinking" such that when failures occur, the framework will output a minimal example case. This example case could be used to create an example-based test for debugging the method under test.
 
 I took the liberty here to make the code executing the topology reusable to the "miss"-use case. The `executeTopology()` method
-takes the input objects and a function for how to filter the output topic, returning a `List` used in our test assertions. In the "match"-use case, we expect there to be a value in the returned `List`.
+takes the input objects (`User` and `Device`) and a `Function` dictating how to filter the output topic, returning a `List` used in our test assertions. In the "match" use case, we expect there to be a value in the returned `List`.
 
 ```java
     private List<UserDeviceDetails> executeTopology(final User inputUser, final Device inputDevice,
@@ -286,7 +282,7 @@ edge-cases#tried = 50         | # of edge cases tried in current run
 seed = -8018840044203219213   | random seed to reproduce generated values
 ```
 
-The "miss"-use case will force the `userId` values of the input objects to NOT be equal. The result of the topology should then be NO MATCH - manifested by our `executeTopology()` method returned an empty `List` from the output topic.
+The "miss" use case test will force the user ID values of the input objects to NOT be equal. The join does not match the `User` to the `Device` - this our `executeTopology()` method returns an empty `List` from the output topic.
 
 ```java
     @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
@@ -334,7 +330,7 @@ seed = -1411052433841211412   | random seed to reproduce generated values
 
 == What about other Kafka-based stream processing?
 
-Great question. The examples here are limited to Kafka Streams. I am experimenting with Flink SQL, which is proving quite the challenge when performing multiple tries with Flink functionality like aggregations. Using the `Arbitrary` suppliers is still useful in this case, generating random input beyond my typical imagination. In the future I'll revisit Flink SQL, along with the Flink Table API in Java.
+Great question. The examples here are limited to Kafka Streams. I am experimenting with Flink SQL, which is proving quite the challenge when performing multiple tries with operations like aggregations. Using the `Arbitrary` suppliers is still useful in this case, generating random input beyond my typical imagination. In the future I'll revisit Flink SQL, along with the Flink Table API in Java.
 
 Watch this space...
 
