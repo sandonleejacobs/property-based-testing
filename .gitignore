@@ -44,3 +44,6 @@ bin/
 
 ### jqwik stuff ###
 .jqwik-database
+
+### Doc Gen ###
+*.docx

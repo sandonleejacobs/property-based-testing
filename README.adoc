@@ -10,24 +10,40 @@ example-based tests are useful, but the "universe of possible inputs" could gene
 If the code survives a property-based test suite, you'll have a greater degree of confidence in the resiliency of that method
 in the production environment.
 
+== Applying the Paradigm to Data Pipelines
+
 The asynchronous, distributed nature of stream processing codebases could greatly benefit from this type of resiliency testing.
 Why? In most cases there's not a problem until there's a PROBLEM! Are these data pipelines processing events from multiple locales in several languages? What about data formats? Special characters? Null/empty values?
 
 Let's take a swag at applying the principles of property-based testing to Apache Kafka-based stream processing applications
 and topologies. We'll start with Kafka Streams, then attempt the same with Flink SQL. This is a Java example project. Therefore,
-we'll use the https://jqwik.net/)[jqwik] framework to generate arbitrary objects as input events. Jqwik is far from the pioneer
-in the realm of property-based testing - not even on the JVM. For more information on property-based testing and other
-frameworks which support this paradigm, check out https://jqwik.net/property-based-testing.html)[this page] in the jqwik documentation.
+we'll use the https://jqwik.net/)[jqwik] framework to generate arbitrary objects as input events.
 
-== Kafka Streams
+== Tooling
+
+Coming back to Java shops, I've always looked for libraries to provide the tools I found useful in more functional paradigm languages. In my Scala/Finatra/Spark days, I was impressed by libraries like https://scalacheck.org/)[scalacheck] - particularly how simple it was to generate random inputs and run many scenarios with a short feedback loop. I also enjoyed the bindings to test libraries like scalatest and specs2, such that it wasn't cumbersome to implement and incorporate these tests into the existing test pipeline.
+
+https://jqwik.net)[Jqwik] seems to check those boxes, integrating seamlessly with JUnit to execute test scenarios. For more information on property-based testing and other frameworks which support this paradigm, check out https://jqwik.net/property-based-testing.html)[this page] in the jqwik documentation.
+
+Jqwik is far from the pioneer in the realm of property-based testing - not even on the JVM. Clojure now has https://clojure.org/guides/test_check_beginner)[test.check] - earlier there was test.generative. All of these frameworks are inspired in some way by Haskell https://hackage.haskell.org/package/QuickCheck)[QuickCheck].
+
+.Quick Aside
+****
+I believe there is a welcomed side effect - particularly for Java codebases - when it comes to property-based testing. I find the style of my code to become much more functional and concise in nature. Object-oriented programming can easily lead us towards behavior such as methods with side effects, mutability, and overuse of instance fields. In distributed, event-driven systems, problems caused by misuse of such constructs can cause a lot of harm in very short order.
+
+NOTE: When we begin thinking more functional, our code becomes much easier to read, debug, and refactor. Our applications are now composed of well-tested, highly resilient functions.
+****
+
+== Examples with Kafka Streams
+
 The `test-utils` module of Kafka Streams provides the tools we need to execute JUnit test cases of a given topology. The `TopologyTestDriver` can be used to pipe data to input topics and interrogate output topics, applying basic assertions on the output data.
 
-Let's create both a simple and more realistic topology with property-based test suites.
+Using the provided `test-utils` along with Jqwik, let's create a simple topology with property-based test suites. Later, we'll explore a more "realistic" topology - specifically a join of 2 streams.
 
 === Simple Example
 
-The ShoutStreams topology is a very simple use case to start our Kafka Streams discussion. This topology simply performs
-a `toUpperCase()` on any `String` input event, piping that result to the designed output topic.
+The `ShoutStreams` topology is a very simple use case to start our property-based test discussion. This topology simply performs
+a `toUpperCase()` on any `String` input event, piping the resulting `String` to the designed output topic.
 
 ```java
     public Topology buildTopology(final Properties props) {
@@ -103,10 +119,9 @@ edge-cases#tried = 7          | # of edge cases tried in current run
 seed = -8907747202341246742   | random seed to reproduce generated values
 ```
 
-Now you see a tangible benefit: we ran 1000 tests on this method in a matter of seconds. It's virtually impossible to code this
-number of example-based tests.
+Now you see a tangible benefit: we ran 1000 tests on this method in a matter of seconds. ONE THOUSAND TEST SCENARIOS! It's virtually impossible to code this number of example-based tests.
 
-This simple example is nice. But maybe over-simplified? My Kafka Streams topologies have REAL work to do.
+So you're likely thinking: This simple example is nice. Maybe over-simplified. My Kafka Streams topologies have REAL work to do.
 
 === Join Example
 
@@ -255,6 +270,22 @@ takes the input objects and a function for how to filter the output topic, retur
 
 ```
 
+The output of the `testMatch` execution would look something like this:
+
+```shell
+timestamp = 2024-06-18T14:13:52.089763, DeviceUserEnricherTest:testMatch =
+                              |-----------------------jqwik-----------------------
+tries = 50                    | # of calls to property
+checks = 50                   | # of not rejected calls
+generation = RANDOMIZED       | parameters are randomly generated
+after-failure = SAMPLE_FIRST  | try previously failed sample, then previous seed
+when-fixed-seed = ALLOW       | fixing the random seed is allowed
+edge-cases#mode = FIRST       | edge cases are generated first
+edge-cases#total = 50         | # of all combined edge cases
+edge-cases#tried = 50         | # of edge cases tried in current run
+seed = -8018840044203219213   | random seed to reproduce generated values
+```
+
 The "miss"-use case will force the `userId` values of the input objects to NOT be equal. The result of the topology should then be NO MATCH - manifested by our `executeTopology()` method returned an empty `List` from the output topic.
 
 ```java
@@ -284,3 +315,32 @@ The "miss"-use case will force the `userId` values of the input objects to NOT b
         assertTrue(output.isEmpty());
     }
 ```
+
+The output of the `testMiss` execution would look something like this:
+
+```shell
+timestamp = 2024-06-18T14:13:59.606335, DeviceUserEnricherTest:testMiss =
+                              |-----------------------jqwik-----------------------
+tries = 50                    | # of calls to property
+checks = 50                   | # of not rejected calls
+generation = RANDOMIZED       | parameters are randomly generated
+after-failure = SAMPLE_FIRST  | try previously failed sample, then previous seed
+when-fixed-seed = ALLOW       | fixing the random seed is allowed
+edge-cases#mode = FIRST       | edge cases are generated first
+edge-cases#total = 50         | # of all combined edge cases
+edge-cases#tried = 50         | # of edge cases tried in current run
+seed = -1411052433841211412   | random seed to reproduce generated values
+```
+
+.What about other Kafka-based stream processing?
+****
+Great question. The examples here are limited to Kafka Streams. I am experimenting with Flink SQL, which is proving quite the challenge when performing multiple tries with Flink functionality like aggregations. Using the `Arbitrary` suppliers is still useful in this case, generating random input beyond my typical imagination. In the future I'll revisit Flink SQL, along with the Flink Table API in Java.
+
+Watch this space...
+****
+
+== In Summary
+
+As developers and test engineers, it's beyond our reach to create example-based tests to cover the universe of possible inputs to the functions that compose our applications. Property-based testing is a powerful way to gauge and improve the resiliency of any function. Murphy's law applies to production data, so why not use tools to help mitigate the anomalies we have yet to imagine.
+
+Libraries like jqwik are here to facilitate just that. There are other JVM libraries and frameworks, as well as implementations for other languages you may use in your stream processing applications. In the end, the goal is quality through resiliency. I think you'll find property-based testing to be a useful part of your toolbelt.
