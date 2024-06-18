@@ -27,12 +27,12 @@ https://jqwik.net)[Jqwik] seems to check those boxes, integrating seamlessly wit
 
 Jqwik is far from the pioneer in the realm of property-based testing - not even on the JVM. Clojure now has https://clojure.org/guides/test_check_beginner)[test.check] - earlier there was test.generative. All of these frameworks are inspired in some way by Haskell https://hackage.haskell.org/package/QuickCheck)[QuickCheck].
 
-.Quick Aside
-****
+=== Quick Aside
+
 I believe there is a welcomed side effect - particularly for Java codebases - when it comes to property-based testing. I find the style of my code to become much more functional and concise in nature. Object-oriented programming can easily lead us towards behavior such as methods with side effects, mutability, and overuse of instance fields. In distributed, event-driven systems, problems caused by misuse of such constructs can cause a lot of harm in very short order.
 
 NOTE: When we begin thinking more functional, our code becomes much easier to read, debug, and refactor. Our applications are now composed of well-tested, highly resilient functions.
-****
+
 
 == Examples with Kafka Streams
 
@@ -332,12 +332,11 @@ edge-cases#tried = 50         | # of edge cases tried in current run
 seed = -1411052433841211412   | random seed to reproduce generated values
 ```
 
-.What about other Kafka-based stream processing?
-****
+== What about other Kafka-based stream processing?
+
 Great question. The examples here are limited to Kafka Streams. I am experimenting with Flink SQL, which is proving quite the challenge when performing multiple tries with Flink functionality like aggregations. Using the `Arbitrary` suppliers is still useful in this case, generating random input beyond my typical imagination. In the future I'll revisit Flink SQL, along with the Flink Table API in Java.
 
 Watch this space...
-****
 
 == In Summary
 
