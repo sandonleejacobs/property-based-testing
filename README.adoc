@@ -99,7 +99,7 @@ output.
 Let's explain some concepts here. The junit-savvy user will immediately notice the `@Property` annotation versus the typical
 `@Test` annotation. This tells jUnit to execute this test with the `jqwik` runner.
 
-Next is the `@ForAll` annotation on a parameter in the test method. This tells jqwik to generate some input with "interesting" values. In this case, we explicitly define an `Arbritrary` supplier to use for generating input - a method annotated to `@Provide` an `Arbitrary<String>`. As the name implies, an `Arbitrary` is just random choice.
+Next is the `@ForAll` annotation on a parameter in the test method. This tells jqwik to generate some input with "interesting" values. In this case, we explicitly define an `Arbitrary` supplier to use for generating input - a method annotated to `@Provide` an `Arbitrary<String>`. As the name implies, an `Arbitrary` is just random choice.
 
 Our `@Provide` supplier uses one of the canned `Arbitraries` methods to define how we'd like our generated `String` objects. The resulting `String` will be alphanumeric of some length between 1 and 100 characters.
 
@@ -203,7 +203,7 @@ There are 2 cases to test here - the "match" and the "miss" of the defined join.
     }
 ```
 
-With there `Arbitrary` suppliers, we can get into our test cases. In the "match" case, we'll manipulate the input objects to simulate an expected match from the topology:
+With these `Arbitrary` suppliers, we can get into our test cases. In the "match" case, we'll manipulate the input objects to simulate an expected match from the topology:
 
 ```java
     @Property(tries = 50, edgeCases = EdgeCasesMode.FIRST, shrinking = ShrinkingMode.BOUNDED)
@@ -340,6 +340,6 @@ Watch this space...
 
 == In Summary
 
-As developers and test engineers, it's beyond our reach to create example-based tests to cover the universe of possible inputs to the functions that compose our applications. Property-based testing is a powerful way to gauge and improve the resiliency of any function. Murphy's law applies to production data, so why not use tools to help mitigate the anomalies we have yet to imagine.
+As developers and test engineers, it's beyond our reach to create example-based tests to cover the universe of possible inputs we could encounter. Property-based testing is a powerful way to gauge and improve the resiliency of any function. Murphy's law applies to production data, so why not use tools to help mitigate the outcomes we have yet to imagine.
 
 Libraries like jqwik are here to facilitate just that. There are other JVM libraries and frameworks, as well as implementations for other languages you may use in your stream processing applications. In the end, the goal is quality through resiliency. I think you'll find property-based testing to be a useful part of your toolbelt.
