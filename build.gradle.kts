@@ -27,24 +27,25 @@ version = "1.0-SNAPSHOT"
 
 val junitJupiterVersion = "5.10.2"
 val jqwikVersion = "1.8.4"
-
 val jacksonVersion = "2.17.1"
-
+val kafkaStreamsVersion = "3.7.0"
+val logbackVersion = "1.4.14"
 val lombokVersion = "1.18.32"
+val slf4jVersion = "2.0.11"
 
 tasks.compileTestJava {
     options.compilerArgs.add("-parameters")
 }
 
 dependencies {
-    implementation("org.slf4j:slf4j-api:2.0.11")
-    implementation("org.slf4j:slf4j-simple:2.0.11")
-    implementation("ch.qos.logback:logback-core:1.4.14")
+    implementation("org.slf4j:slf4j-api:${slf4jVersion}")
+    implementation("org.slf4j:slf4j-simple:${slf4jVersion}")
+    implementation("ch.qos.logback:logback-core:${logbackVersion}")
 
-    implementation("org.apache.kafka:kafka-streams:3.6.0")
+    implementation("org.apache.kafka:kafka-streams:${kafkaStreamsVersion}")
     implementation("org.apache.kafka:kafka-clients") {
         version {
-            strictly("3.6.0")
+            strictly(kafkaStreamsVersion)
         }
     }
 
@@ -58,18 +59,12 @@ dependencies {
     testCompileOnly("org.projectlombok:lombok:${lombokVersion}")
     testAnnotationProcessor("org.projectlombok:lombok:${lombokVersion}")
 
-    implementation("io.confluent:kafka-schema-rules:7.6.0")
-
-    testImplementation("org.apache.kafka:kafka-streams-test-utils:3.6.0")
+    testImplementation("org.apache.kafka:kafka-streams-test-utils:${kafkaStreamsVersion}")
     // aggregate jqwik dependency
     testImplementation("net.jqwik:jqwik:$jqwikVersion")
     // Add if you also want to use the Jupiter engine or Assertions from it
     testImplementation("org.junit.jupiter:junit-jupiter:$junitJupiterVersion")
-    // Add any other test library you need...
-    testImplementation("org.assertj:assertj-core:3.23.1")
-    testImplementation("org.mockito:mockito-core:3.+")
-    // Optional but recommended to get annotation related API warnings
-    compileOnly("org.jetbrains:annotations:23.0.0")
+
 }
 
 tasks.test {
